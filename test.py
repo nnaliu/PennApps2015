@@ -1,17 +1,23 @@
 import urllib2
+from zipfile import ZipFile
+from StringIO import StringIO
 import json
 import csv
-from pymongo import MongoClient
+from pymongo import MongoClient, GEO2D
 
 client = MongoClient()
 db = client.crimes
 philly_crimes = db.philly
-philly_crimes.ensure_index([('loc', '2d')])
+philly_crimes.ensure_index([('loc', GEO2D)])
 
 
-with open('police_inct.csv', 'rb') as csvfile:
+url = urllib2.urlopen("http://gis.phila.gov/gisdata/police_inct.zip")
+zipfile = ZipFile(StringIO(url.read()))
+
+with zipfile.open('police_inct.csv') as csvfile:
 	crimes = csv.DictReader(csvfile, delimiter=',')
 	for crime in crimes:
+		print crime['TEXT_GENERAL_CODE']
 		check_duplicate = philly_crimes.find_one({'_id': crime['OBJECTID']})
 		if check_duplicate == None and crime['DISPATCH_DATE'] > '2015-07-01' and \
 			(crime['POINT_X'] != "" and crime['POINT_Y'] != ""):
