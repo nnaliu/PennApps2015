@@ -1,5 +1,6 @@
 import urllib2
 import json
+import csv
 from pymongo import MongoClient
 
 client = MongoClient()
@@ -7,37 +8,56 @@ db = client.crimes
 philly_crimes = db.philly
 philly_crimes.ensure_index([('loc', '2d')])
 
-url = 'https://api.everyblock.com/content/philly/topnews/?token=2468648eaf3a967061f727a478bd0b703797dc01&schema=crime&date=descending'
+
+with open('police_inct.csv', 'rb') as csvfile:
+	crimes = csv.DictReader(csvfile, delimiter=',')
+	for crime in crimes:
+		check_duplicate = philly_crimes.find_one({'_id': crime['OBJECTID']})
+		if check_duplicate == None and crime['DISPATCH_DATE'] > '2015-07-01' and \
+			(crime['POINT_X'] != "" and crime['POINT_Y'] != ""):
+			record = {}
+			record['_id'] = crime['OBJECTID']
+			record['date'] = crime['DISPATCH_DATE']
+			record['time'] = crime['DISPATCH_TIME']
+			record['address'] = crime['LOCATION_BLOCK']
+			record['type'] = crime['TEXT_GENERAL_CODE']
+			record['loc'] = [float(crime['POINT_X']), float(crime['POINT_Y'])]
+
+			philly_crimes.insert_one(record)
+			print(record)
+
+
+#url = 'https://api.everyblock.com/content/philly/topnews/?token=2468648eaf3a967061f727a478bd0b703797dc01&schema=crime&date=descending'
 
 #while url != None:
-response = urllib2.urlopen(url)
-data = json.load(response)
+# response = urllib2.urlopen(url)
+# data = json.load(response)
 
-for item in data['results']:
+# for item in data['results']:
 
-	check_duplicate = philly_crimes.find_one({'_id': item['id']})
-	if check_duplicate == None:
-		record = {}
-		record['_id'] = item['id']
-		record['title'] = item['title']
-		record['item_date'] = item['item_date']
-		record['location'] = item['location_name']
-		record['url'] = item['url']
+# 	check_duplicate = philly_crimes.find_one({'_id': item['id']})
+# 	if check_duplicate == None:
+# 		record = {}
+# 		record['_id'] = item['id']
+# 		record['title'] = item['title']
+# 		record['item_date'] = item['item_date']
+# 		record['location'] = item['location_name']
+# 		record['url'] = item['url']
 
-		addressUrl = 'https://maps.googleapis.com/maps/api/geocode/json?address=' \
-			+ record['location'].replace(' ', '+') + ',+Philadelphia,+PA&key=AIzaSyB9FBh9QtZ1UbwAyn5rr_jXx8dlTk8lONc'
-		addressResponse = urllib2.urlopen(addressUrl)
-		addressData = json.load(addressResponse)
+# 		addressUrl = 'https://maps.googleapis.com/maps/api/geocode/json?address=' \
+# 			+ record['location'].replace(' ', '+') + ',+Philadelphia,+PA&key=AIzaSyB9FBh9QtZ1UbwAyn5rr_jXx8dlTk8lONc'
+# 		addressResponse = urllib2.urlopen(addressUrl)
+# 		addressData = json.load(addressResponse)
 
-		addressDataLocation = addressData['results'][0]['geometry']['location']
-		record['loc'] = [addressDataLocation['lng'], addressDataLocation['lat']]
+# 		addressDataLocation = addressData['results'][0]['geometry']['location']
+# 		record['loc'] = [addressDataLocation['lng'], addressDataLocation['lat']]
 
-		philly_crimes.insert_one(record)
+# 		philly_crimes.insert_one(record)
 
-		#print(record['lat'])
-		#print
-	else:
-		break
+# 		print(record['lat'])
+# 		print
+# 	else:
+# 		break
 
 #url = data['next']
 
